@@ -1,39 +1,42 @@
+import gzip
 import os
 import re
 import shutil
 
 
-def create_filename(name, counter=0):
-    filename = f"{name}.md"
-    if counter > 0:
-        filename = f"{name}_({counter}).md"
-    if os.path.exists(os.path.join("dist", filename)):
-        return create_filename(name, counter + 1)
+def create_filename(name: str) -> str:
+    counter, filename = 0, f"{name}.md"
+    while os.path.exists(os.path.join("dist", filename)):
+        counter += 1
+        filename = f"{name}({counter}).md"
     return filename
 
 
-def parse_ses(file_path, output_dir="dist", limit=None):
+def parse_ses(file_path: str, output_dir: str = "dist"):
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir)
     with open(file_path, "r", encoding="utf-8") as f:
         write = False
-        i = 0
         prev_file = ""
+
         for line in f:
             line = line.strip().replace("- ", "").rstrip("-")
             if line.endswith(","):
                 line += " "
+
             if not line:
                 continue
+
             if line == "А":
                 write = True
-                i += 1
                 continue
+
             if line.startswith("НАСЕЛЁННЫЕ МОСКВА ы ©"):
                 break
+
             if write:
-                if match := re.search(r"^(?![А-Я](\.)? )[А-Я-]+(\s[А-Я-]+)*(?=[ \,]|\.\.)+", line):
+                if match := re.search(r"^(?![А-Я](\.)? )[А-Я\-]+(?:\s[А-Я\-]+)*(?=[ ,]|\.\.)+", line):
                     upper = match.group()
                     title = upper.lower()
                     row = line.replace(upper, title).replace("- ", "-")
@@ -42,26 +45,17 @@ def parse_ses(file_path, output_dir="dist", limit=None):
                         f.write(row)
                 else:
                     with open(os.path.join(output_dir, prev_file), "a", encoding="utf-8") as f:
-                        if prev_file and line.endswith("-"):
-                            line = line[:-1]
-                        f.write(line)
-                i += 1
-            if limit and i == limit:
-                break
+                        f.write(line.rstrip("-") if line.endswith("-") else line)
 
 
 if __name__ == "__main__":
-    if not os.path.exists("ses.txt"):
-        if os.path.exists("ses.txt.gz"):
-            import gzip
-
-            with gzip.open("ses.txt.gz", "rb") as f_in:
-                with open("ses.txt", "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+    file_path = "ses.txt"
+    file_gz_path = f"{file_path}.gz"
+    if not os.path.exists(file_path):
+        if os.path.exists(file_gz_path):
+            with gzip.open(file_gz_path, "rb") as f_in, open(file_path, "wb") as f_out:
+                f_out.write(f_in.read())
         else:
-            import sys
+            exit(f"File '{file_path}' not found")
 
-            print("File 'ses.txt' not found")
-            sys.exit(1)
-
-    parse_ses("ses.txt")
+    parse_ses(file_path)
